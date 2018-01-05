@@ -23,14 +23,16 @@ y = Weights*x_data + biases
 loss = tf.reduce_mean(tf.square(y-y_data))
 optimizer = tf.train.GradientDescentOptimizer(0.5)
 train = optimizer.minimize(loss)
-
-init = tf.initialize_all_variables()
 ### create tensorflow structure end ###
 
 sess = tf.Session()
 # tf.initialize_all_variables() no long valid from
 # 2017-03-02 if using tensorflow >= 0.12
-sess.run(tf.global_variables_initializer())
+if int((tf.__version__).split('.')[1]) < 12 and int((tf.__version__).split('.')[0]) < 1:
+    init = tf.initialize_all_variables()
+else:
+    init = tf.global_variables_initializer()
+sess.run(init)
 
 for step in range(201):
     sess.run(train)

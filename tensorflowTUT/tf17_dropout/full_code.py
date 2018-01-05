@@ -9,7 +9,7 @@ Please note, this code is only for python 3+. If you are using python 2+, please
 from __future__ import print_function
 import tensorflow as tf
 from sklearn.datasets import load_digits
-from sklearn.cross_validation import train_test_split
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelBinarizer
 
 # load data
@@ -31,7 +31,7 @@ def add_layer(inputs, in_size, out_size, layer_name, activation_function=None, )
         outputs = Wx_plus_b
     else:
         outputs = activation_function(Wx_plus_b, )
-    tf.histogram_summary(layer_name + '/outputs', outputs)
+    tf.summary.histogram(layer_name + '/outputs', outputs)
     return outputs
 
 
@@ -47,19 +47,22 @@ prediction = add_layer(l1, 50, 10, 'l2', activation_function=tf.nn.softmax)
 # the loss between prediction and real data
 cross_entropy = tf.reduce_mean(-tf.reduce_sum(ys * tf.log(prediction),
                                               reduction_indices=[1]))  # loss
-tf.scalar_summary('loss', cross_entropy)
+tf.summary.scalar('loss', cross_entropy)
 train_step = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
 
 sess = tf.Session()
-merged = tf.merge_all_summaries()
+merged = tf.summary.merge_all()
 # summary writer goes in here
-train_writer = tf.train.SummaryWriter("logs/train", sess.graph)
-test_writer = tf.train.SummaryWriter("logs/test", sess.graph)
+train_writer = tf.summary.FileWriter("logs/train", sess.graph)
+test_writer = tf.summary.FileWriter("logs/test", sess.graph)
 
 # tf.initialize_all_variables() no long valid from
 # 2017-03-02 if using tensorflow >= 0.12
-sess.run(tf.global_variables_initializer())
-
+if int((tf.__version__).split('.')[1]) < 12 and int((tf.__version__).split('.')[0]) < 1:
+    init = tf.initialize_all_variables()
+else:
+    init = tf.global_variables_initializer()
+sess.run(init)
 for i in range(500):
     # here to determine the keeping probability
     sess.run(train_step, feed_dict={xs: X_train, ys: y_train, keep_prob: 0.5})

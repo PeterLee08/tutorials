@@ -65,9 +65,12 @@ def RNN(X, weights, biases):
     ##########################################
 
     # basic LSTM Cell.
-    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(n_hidden_units, forget_bias=1.0, state_is_tuple=True)
+    if int((tf.__version__).split('.')[1]) < 12 and int((tf.__version__).split('.')[0]) < 1:
+        cell = tf.nn.rnn_cell.BasicLSTMCell(n_hidden_units, forget_bias=1.0, state_is_tuple=True)
+    else:
+        cell = tf.contrib.rnn.BasicLSTMCell(n_hidden_units)
     # lstm cell is divided into two parts (c_state, h_state)
-    init_state = lstm_cell.zero_state(batch_size, dtype=tf.float32)
+    init_state = cell.zero_state(batch_size, dtype=tf.float32)
 
     # You have 2 options for following step.
     # 1: tf.nn.rnn(cell, inputs);
@@ -77,7 +80,7 @@ def RNN(X, weights, biases):
     # In here, we go for option 2.
     # dynamic_rnn receive Tensor (batch, steps, inputs) or (steps, batch, inputs) as X_in.
     # Make sure the time_major is changed accordingly.
-    outputs, final_state = tf.nn.dynamic_rnn(lstm_cell, X_in, initial_state=init_state, time_major=False)
+    outputs, final_state = tf.nn.dynamic_rnn(cell, X_in, initial_state=init_state, time_major=False)
 
     # hidden layer for output as the final results
     #############################################
@@ -85,14 +88,17 @@ def RNN(X, weights, biases):
 
     # # or
     # unpack to list [(batch, outputs)..] * steps
-    outputs = tf.unpack(tf.transpose(outputs, [1, 0, 2]))    # states is the last outputs
-    results = tf.matmul(outputs[-1], weights['out']) + biases['out']
+    if int((tf.__version__).split('.')[1]) < 12 and int((tf.__version__).split('.')[0]) < 1:
+        outputs = tf.unpack(tf.transpose(outputs, [1, 0, 2]))    # states is the last outputs
+    else:
+        outputs = tf.unstack(tf.transpose(outputs, [1,0,2]))
+    results = tf.matmul(outputs[-1], weights['out']) + biases['out']    # shape = (128, 10)
 
     return results
 
 
 pred = RNN(x, weights, biases)
-cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(pred, y))
+cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y))
 train_op = tf.train.AdamOptimizer(lr).minimize(cost)
 
 correct_pred = tf.equal(tf.argmax(pred, 1), tf.argmax(y, 1))
@@ -101,7 +107,11 @@ accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 with tf.Session() as sess:
     # tf.initialize_all_variables() no long valid from
     # 2017-03-02 if using tensorflow >= 0.12
-    sess.run(tf.global_variables_initializer())
+    if int((tf.__version__).split('.')[1]) < 12 and int((tf.__version__).split('.')[0]) < 1:
+        init = tf.initialize_all_variables()
+    else:
+        init = tf.global_variables_initializer()
+    sess.run(init)
     step = 0
     while step * batch_size < training_iters:
         batch_xs, batch_ys = mnist.train.next_batch(batch_size)
@@ -114,7 +124,7 @@ with tf.Session() as sess:
             print(sess.run(accuracy, feed_dict={
             x: batch_xs,
             y: batch_ys,
-        }))
+            }))
         step += 1
 
 
